@@ -1,0 +1,65 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+crash.log
+
+# Secrets
+*.pem
+*.env
+.env
+
+# Downloaded DICOM binary samples — too large for git
+test-data/dcm-samples/
+test-data/*.tar.bz2
+test-data/24759123_20010101/
+test-data/39419238_20010101/
+test-data/98890234_20030505_CT/
+test-data/98890234_20030505_MR/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# ...but keep the shared debug/test configuration (see docs/TESTING.md).
+# These are team settings, not personal preferences, so they belong in git.
+!.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Build artifacts
+bin/
+obj/
+__pycache__/
+*.pyc
+# The Go binary is named after its directory, so the bin/ rule above misses it.
+gateway/gateway
+
+# Test artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+TestResults/
+*.trx
+
+# Python virtualenv (monitoring-service/.venv — recreate with requirements-dev.txt)
+.venv/
+venv/
+
+# Working notes — not part of the published project
+CLAUDE.md
+MERGE-PLAN.md
+
+# direnv caches the built environment 
+.direnv

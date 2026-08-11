@@ -1,0 +1,8 @@
+{
+  "patientName": "Smith^John^A",
+  "patientId": "PAT001",
+  "studyDate": "20240115",
+  "modality": "CT",
+  "studyDescription": "Chest CT without contrast",
+  "institutionName": "Toronto General Hospital"
+}

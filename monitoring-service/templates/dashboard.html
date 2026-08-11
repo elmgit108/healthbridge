@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthBridge - System Telemetry</title>
+    <!-- Modern Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-grad-1: #0f172a;
+            --bg-grad-2: #1e1b4b;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --status-healthy: #10b981;
+            --status-healthy-glow: rgba(16, 185, 129, 0.5);
+            --status-unhealthy: #ef4444;
+            --status-unhealthy-glow: rgba(239, 68, 68, 0.5);
+            --accent: #3b82f6;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-grad-1) 0%, var(--bg-grad-2) 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Background Orbs */
+        .ambient-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: 0;
+            opacity: 0.5;
+            animation: float 20s infinite alternate ease-in-out;
+        }
+        .orb-1 { width: 400px; height: 400px; background: #3b82f6; top: -100px; left: -100px; }
+        .orb-2 { width: 300px; height: 300px; background: #8b5cf6; bottom: -50px; right: -50px; animation-delay: -5s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(50px, 50px) scale(1.1); }
+        }
+
+        .container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 900px;
+            padding: 2rem;
+            box-sizing: border-box;
+            animation: fadeUp 0.8s ease-out forwards;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-weight: 700;
+            font-size: 2.5rem;
+            margin: 0;
+            background: linear-gradient(to right, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-top: 0.5rem;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .service-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Hover sweep effect */
+        .service-card::before {
+            content: "";
+            position: absolute;
+            top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.05), transparent);
+            transform: skewX(-20deg);
+            transition: all 0.6s ease;
+        }
+        .service-card:hover::before { left: 150%; }
+
+        h2 { margin: 0 0 1rem 0; font-size: 1.2rem; font-weight: 600; color: #fff; }
+
+        .status-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            position: relative;
+        }
+        .status-indicator::after {
+            content: ''; position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px;
+            border-radius: 50%; animation: pulse 2s infinite;
+        }
+
+        .healthy { background: var(--status-healthy); box-shadow: 0 0 10px var(--status-healthy-glow); }
+        .healthy::after { border: 1px solid var(--status-healthy); }
+        .unhealthy { background: var(--status-unhealthy); box-shadow: 0 0 10px var(--status-unhealthy-glow); }
+        .unhealthy::after { border: 1px solid var(--status-unhealthy); animation: pulseFast 1s infinite; }
+
+        @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(2); opacity: 0; } }
+        @keyframes pulseFast { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(2.5); opacity: 0; } }
+
+        .status-text {
+            font-size: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .text-healthy { color: var(--status-healthy); }
+        .text-unhealthy { color: var(--status-unhealthy); }
+
+        .timestamp { font-size: 0.85rem; color: var(--text-secondary); margin: 0; }
+
+        .overall-card {
+            grid-column: 1 / -1;
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(20px);
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .overall-status { font-size: 2rem; font-weight: 700; display: flex; align-items: center; gap: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+
+    <div class="container">
+        <header>
+            <h1>HealthBridge Telemetry</h1>
+            <p class="subtitle">Real-time Polyglot Microservices Health Matrix</p>
+        </header>
+
+        <div class="dashboard-grid">
+            <!-- Overall Status -->
+            <div class="overall-card">
+                <div class="subtitle" style="margin-top:0; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 2px; font-size:0.9rem;">System State</div>
+                <div class="overall-status {{ 'text-healthy' if metrics.status == 'healthy' else 'text-unhealthy' }}">
+                    <div class="status-indicator {{ 'healthy' if metrics.status == 'healthy' else 'unhealthy' }}"></div>
+                    {{ 'OPERATIONAL' if metrics.status == 'healthy' else 'DEGRADED' }}
+                </div>
+            </div>
+
+            <!-- Components -->
+            {% for name, health in metrics.components.items() %}
+            <div class="service-card" style="animation-delay: {{ loop.index * 0.1 }}s">
+                <h2>{{ name | replace('-', ' ') | title }}</h2>
+                
+                <div class="status-container">
+                    <div class="status-indicator {{ 'healthy' if health.status == 'healthy' else 'unhealthy' }}"></div>
+                    <span class="status-text {{ 'text-healthy' if health.status == 'healthy' else 'text-unhealthy' }}">
+                        {{ health.status }}
+                    </span>
+                </div>
+                
+                <p class="timestamp">Last ping: {{ health.timestamp[:19] | replace('T', ' ') }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

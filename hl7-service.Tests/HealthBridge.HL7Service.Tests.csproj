@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>HealthBridge.HL7Service.Tests</RootNamespace>
+
+    <!-- Keeps the debugger stepping into library code (nHapi, fo-dicom, Firely)
+         instead of stopping at the boundary. See docs/TESTING.md. -->
+    <DebugType>portable</DebugType>
+
+    <!-- The service targets net8.0 (matching the mcr.microsoft.com/dotnet/aspnet:8.0
+         runtime image), but a dev machine may only have newer runtimes installed.
+         LatestMajor lets the test host roll forward onto whatever is present so
+         `dotnet test` works without installing the .NET 8 runtime.
+
+         Trade-off: the tests then execute on a different runtime than production.
+         Install the .NET 8 runtime for an exact match — see docs/TESTING.md.
+         This applies to the TEST project only; the service itself is unaffected. -->
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Referencing the web project also flows the Microsoft.AspNetCore.App framework
+         reference through to the tests, so IConfiguration / IHttpContextAccessor /
+         ControllerBase are all available here without extra packages. -->
+    <ProjectReference Include="../hl7-service/HealthBridge.HL7Service.csproj" />
+  </ItemGroup>
+
+</Project>

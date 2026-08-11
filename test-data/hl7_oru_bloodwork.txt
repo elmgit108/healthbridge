@@ -1,0 +1,8 @@
+MSH|^~\&|LabSystem|ClinicalLab|HealthBridge|CLOUD|20240301141500||ORU^R01|MSG004|P|2.5
+PID|1||PAT004^^^MRN||Chen^David^W||19880901|M
+OBR|1|||BMP^Basic Metabolic Panel
+OBX|1|NM|GLU^Glucose||95|mg/dL|70-100|N|||F
+OBX|2|NM|BUN^Blood Urea Nitrogen||15|mg/dL|7-20|N|||F
+OBX|3|NM|CRE^Creatinine||1.1|mg/dL|0.7-1.3|N|||F
+OBX|4|NM|NA^Sodium||140|mmol/L|136-145|N|||F
+OBX|5|NM|K^Potassium||4.2|mmol/L|3.5-5.1|N|||F

@@ -1,0 +1,8 @@
+{
+  "patientName": "Doe^Jane",
+  "patientId": "PAT002",
+  "studyDate": "20240220",
+  "modality": "MR",
+  "studyDescription": "Brain MRI with and without contrast",
+  "institutionName": "Sunnybrook Health Sciences Centre"
+}
