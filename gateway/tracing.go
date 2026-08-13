@@ -12,7 +12,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -48,7 +48,7 @@ func initTracer() func(context.Context) error {
 		),
 	)
 	if err != nil {
-		log.Printf("WARN: failed to create OTLP exporter (%v) — continuing without tracing", err)
+		slog.Warn("Failed to create OTLP exporter — continuing without tracing", "error", err)
 		return func(context.Context) error { return nil }
 	}
 
@@ -60,7 +60,7 @@ func initTracer() func(context.Context) error {
 		),
 	)
 	if err != nil {
-		log.Printf("WARN: failed to create resource: %v", err)
+		slog.Warn("Failed to create resource:", "error", err)
 	}
 
 	// Tracer provider — batches spans and forwards them to the exporter
@@ -73,7 +73,7 @@ func initTracer() func(context.Context) error {
 	// Register globally so otelhttp middleware picks it up
 	otel.SetTracerProvider(tp)
 
-	log.Printf("OpenTelemetry tracing initialized — exporting to %s", endpoint)
+	slog.Info("OpenTelemetry tracing initialized", "endpoint", endpoint)
 
 	return tp.Shutdown
 }

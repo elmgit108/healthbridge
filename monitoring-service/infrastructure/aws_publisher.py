@@ -35,12 +35,14 @@ class CloudWatchPublisher(IMetricPublisher):
             self.client = boto3.client('cloudwatch', region_name=region_name)
         except Exception as e:
             # Graceful degradation — service still works without AWS credentials
-            logger.warning(f"Failed to initialize boto3 CloudWatch client: {e}")
+            logger.warning("Failed to initialize boto3 CloudWatch client",
+               extra={"region": region_name}, exc_info=True)
             self.client = None
 
     def push_metric(self, name: str, value: float, dimensions: Dict[str, str] = None) -> bool:
         if not self.client:
-            logger.error("CloudWatch client is not properly initialized. Cannot push metrics.")
+            logger.error("CloudWatch client is not initialized — cannot push metrics",
+                extra={"metric": name})
             return False
 
         # Convert {"ServiceName": "hl7-service"} → [{"Name": "ServiceName", "Value": "hl7-service"}]
@@ -58,8 +60,8 @@ class CloudWatchPublisher(IMetricPublisher):
                     },
                 ]
             )
-            logger.info(f"Pushed AWS metric {name}={value}")
+            logger.info("Pushed AWS metric", extra={"metric": name, "value": value, "namespace": METRIC_NAMESPACE})
             return True
         except Exception as e:
-            logger.error(f"Failed to push metric to AWS: {e}")
+            logger.error("Failed to push metric to AWS", extra={"metric": name}, exc_info=True)
             return False

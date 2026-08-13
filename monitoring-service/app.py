@@ -21,18 +21,28 @@ from infrastructure.aws_publisher import CloudWatchPublisher
 from infrastructure.azure_publisher import AzureMonitorPublisher
 from infrastructure.http_health_checker import HttpHealthChecker
 from infrastructure.tracing import init_tracing
+from infrastructure.logging_config import init_logging, init_request_logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 def create_app():
     """Flask application factory — wires up all dependencies and starts background jobs."""
     app = Flask(__name__)
 
+    # --- Structured JSON logging (ROADMAP A1) ---
+    # Must run before anything else logs — including init_tracing() below, whose
+    # startup line would otherwise be plain text. Replaces the old
+    # logging.basicConfig() call that used to sit at module level.
+    init_logging()
+
     # --- OpenTelemetry distributed tracing ---
     # Auto-instruments Flask + requests so a single trace spans gateway → C# → Python.
     # Must be called before routes are registered for full instrumentation.
     init_tracing(app)
+
+    # One structured log line per HTTP request — the access log. Replaces
+    # Werkzeug's plain-text version, which init_logging() silenced.
+    init_request_logging(app)
 
     # --- Dependency Injection Wiring ---
     # This manual DI replaces what a framework like FastAPI or .NET does automatically.

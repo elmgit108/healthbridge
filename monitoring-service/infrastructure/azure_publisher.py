@@ -21,14 +21,14 @@ class AzureMonitorPublisher(IMetricPublisher):
 
     def __init__(self):
         # Production would initialize: MetricsClient(credential=DefaultAzureCredential())
-        logger.info("Azure Monitor Publisher initialized (stub mode)")
+        logger.info("Azure Monitor Publisher initialized", extra={"mode": "stub"})
 
     def push_metric(self, name: str, value: float, dimensions: Dict[str, str] = None) -> bool:
         dim_str = str(dimensions) if dimensions else "None"
         try:
             # TODO: Replace with actual Azure Monitor API call post-POC
-            logger.info(f"Pushed Azure metric {name}={value} [Dims: {dim_str}]")
+            logger.info("Pushed Azure metric", extra={"metric": name, "value": value, "dimensions": dim_str})
             return True
         except Exception as e:
-            logger.error(f"Failed to push metric to Azure: {e}")
+            logger.error("Failed to push metric to Azure", extra={"metric": name}, exc_info=True)
             return False

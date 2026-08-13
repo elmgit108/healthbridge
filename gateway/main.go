@@ -19,7 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -84,8 +84,16 @@ func requestLogger(next http.Handler) http.Handler {
 
 		next.ServeHTTP(lrw, r)
 
-		duration := time.Since(start)
-		log.Printf("%s\t%s\t%d\t%v", r.Method, r.RequestURI, lrw.statusCode, duration)
+		elapsedMs := float64(time.Since(start).Nanoseconds()) / 1e6
+		slog.Info(
+			fmt.Sprintf("HTTP %s %s responded %d in %.4f ms",
+				r.Method, r.URL.Path, lrw.statusCode, elapsedMs),
+			"RequestMethod", r.Method,
+			"RequestPath", r.URL.Path,
+			"StatusCode", lrw.statusCode,
+			"Elapsed", elapsedMs,
+			"logger", "gateway.request",
+		)
 	})
 }
 
@@ -98,9 +106,9 @@ func requestLogger(next http.Handler) http.Handler {
 func createProxy(target string) *httputil.ReverseProxy {
 	tgt, err := url.Parse(target)
 	if err != nil {
-		log.Fatalf("Invalid target URL %s: %v", target, err)
+		slog.Error("Invalid target URL", "target", target, "error", err)
+		os.Exit(1)
 	}
-
 	// Rewrite mode, not NewSingleHostReverseProxy, so the X-Forwarded-* headers are
 	// built from the real connection instead of trusted from the caller.
 	//
@@ -133,7 +141,7 @@ func createProxy(target string) *httputil.ReverseProxy {
 
 	// Custom error handler — returns a JSON error instead of the default HTML
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, e error) {
-		log.Printf("Proxy error to %s: %v", target, e)
+		slog.Error("Proxy error", "target", target, "error", e)
 		http.Error(w, `{"error": "Downstream service unavailable"}`, http.StatusServiceUnavailable)
 	}
 	return proxy
@@ -227,6 +235,10 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
+	// Structured JSON logging must be first — initTracer() below logs.
+	initLogging()
+
 	// --- Initialize OpenTelemetry tracing ---
 	// Tracer is set as the global provider; otelhttp will use it automatically.
 	// Shutdown is deferred so any buffered spans are flushed before exit.
@@ -235,7 +247,7 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := shutdownTracer(ctx); err != nil {
-			log.Printf("Error shutting down tracer: %v", err)
+			slog.Error("Error shutting down tracer", "error", err)
 		}
 	}()
 
@@ -268,9 +280,10 @@ func main() {
 	// a span automatically, and trace context is propagated to downstream services.
 	tracedRouter := otelhttp.NewHandler(router, "gateway.request")
 
-	log.Printf("HealthBridge Gateway starting on port %s...", port)
+	slog.Info("HealthBridge Gateway starting", "port", port)
 	err := http.ListenAndServe(fmt.Sprintf(":%s", port), tracedRouter)
 	if err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+		slog.Error("Server failed to start", "error", err)
+		os.Exit(1)
 	}
 }

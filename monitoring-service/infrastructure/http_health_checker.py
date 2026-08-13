@@ -28,7 +28,7 @@ class HttpHealthChecker(IHealthChecker):
             if response.status_code == 200:
                 health_status = HealthStatus.HEALTHY
         except Exception as e:
-            logger.debug(f"Health check failed for {service_url}: {e}")
+            logger.debug("Health check failed", extra={"target": service_url}, exc_info=True)
 
         return {
             'status': health_status,

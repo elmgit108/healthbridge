@@ -13,8 +13,59 @@ using HealthBridge.HL7Service.Builders;
 using HealthBridge.HL7Service.Security;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Serilog;
+using Serilog.Events;
+using Serilog.Templates;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// One source of truth for the service name — used by both the Serilog enricher
+// below and the OpenTelemetry resource further down, so logs and traces always
+// agree. docker-compose.yml sets OTEL_SERVICE_NAME; the literal is the fallback.
+var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "hl7-service";
+
+// --- Structured JSON logging  ---
+// AddSerilog registers a SerilogLoggerFactory, which *replaces* ILoggerFactory
+// rather than joining the provider list. The built-in console/debug providers
+// are therefore bypassed: no double output, no ClearProviders() call needed.
+//
+// No call site changed. The existing logs already use message templates, so
+// ..rest() promotes their named values ({Type}, {Id}, {Strategy} from
+// Services/HL7ParserService.cs) to top-level JSON fields.
+//
+// ExpressionTemplate rather than CompactJsonFormatter so the field names are
+// ours: CLEF's @t/@l/@mt clash with the @-prefixed fields CloudWatch Logs
+// Insights reserves, and gateway (Go) and monitoring-service (Python) have to
+// emit the same names for one query to span all three services.
+builder.Services.AddSerilog((services, cfg) => cfg
+    .MinimumLevel.Information()
+    // Silences ASP.NET's three-lines-per-request chatter. It does not reach
+    // UseSerilogRequestLogging below, which logs under a different category.
+    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+    // Prerequisite for A2: middleware pushes request_id, every line picks it up.
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("service", serviceName)
+    // The level names are spelled out by hand because Serilog.Expressions 5.0.0
+    // ships ToLower but no ToUpper — and an unknown function resolves to
+    // *undefined* rather than throwing, so the key would vanish from the output
+    // with no error. Values match Go slog's defaults (INFO / WARN / ERROR).
+    .WriteTo.Console(new ExpressionTemplate(
+        "{ {" +
+        "timestamp: UtcDateTime(@t), "+
+        "level: if @l = 'Information' then 'INFO'" +
+        " else if @l = 'Warning' then 'WARN'" +
+        " else if @l = 'Error' then 'ERROR'" +
+        " else if @l = 'Fatal' then 'FATAL'" +
+        " else if @l = 'Debug' then 'DEBUG'" + 
+        " else 'TRACE', " +
+        // logger: SourceContext renames Serilog's category property to the name
+        // Python and Go use. Naming it here also drops it from ..rest(), so it
+        // is not emitted twice.
+        "message: @m, logger: SourceContext, exception: @x, ..rest()} }\n"))
+    // Last in the chain on purpose: with no "Serilog" section present this is a
+    // no-op, but it lets Serilog__MinimumLevel__Default (an env var, so a
+    // ConfigMap edit) raise verbosity on a running pod without an image rebuild.
+    .ReadFrom.Configuration(builder.Configuration));
 
 // --- ASP.NET Core framework services ---
 builder.Services.AddControllers();
@@ -82,7 +133,7 @@ var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOI
 
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource
-        .AddService(serviceName: "hl7-service", serviceVersion: "1.0.0"))
+        .AddService(serviceName, serviceVersion: "1.0.0"))
     .WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
@@ -93,6 +144,12 @@ builder.Services.AddOpenTelemetry()
         }));
 
 var app = builder.Build();
+
+// One log line per HTTP request (method, path, status, elapsed ms) — the access
+// log. Placed before everything else so it wraps the whole pipeline. It logs
+// under Serilog.AspNetCore.RequestLoggingMiddleware, so the Microsoft.AspNetCore
+// level override above does not suppress it.
+app.UseSerilogRequestLogging();
 
 // Swagger UI available at /swagger for interactive API testing
 app.UseSwagger();

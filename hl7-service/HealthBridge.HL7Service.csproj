@@ -16,6 +16,8 @@
     <PackageReference Include="NHapi.Model.V25" Version="3.2.4" />
     <!-- fo-dicom 5.1.2 pinned System.Text.Json 6.0.9 (GHSA-8g4q-xg66-9fp4, High). -->
     <PackageReference Include="fo-dicom" Version="5.2.6" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Expressions" Version="5.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
     <!-- HL7 FHIR R4 — official .NET library from HL7 International -->
     <PackageReference Include="Hl7.Fhir.R4" Version="5.4.0" />
