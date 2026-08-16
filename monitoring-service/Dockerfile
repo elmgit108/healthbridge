@@ -4,8 +4,13 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Set environment variables for Python standard behaviors
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+#"ENV key=value" should be used, legacy "ENV key value"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# to connect the package to the github repo.
+LABEL org.opencontainers.image.source=https://github.com/elmgit108/healthbridge
+
 
 # curl is needed for docker-compose HEALTHCHECK; not present in python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends curl \

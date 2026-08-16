@@ -17,6 +17,9 @@ RUN go mod tidy && go build -o gateway .
 FROM alpine:3.24
 WORKDIR /app
 
+# to connect the package to the github repo.
+LABEL org.opencontainers.image.source=https://github.com/elmgit108/healthbridge
+
 # Create a non-root user for better security context
 RUN adduser -D -g '' gatekeeper
 USER gatekeeper
