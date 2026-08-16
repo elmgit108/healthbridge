@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 class AzureMonitorPublisher(IMetricPublisher):
     """
-    Pushes custom metrics to Azure Monitor.
+    Placeholder for Azure Monitor publishing. Not implemented — returns False.
 
     Currently a stub implementation for the POC — logs metrics instead of sending
     them to Azure. In production, this would use:
@@ -25,10 +25,6 @@ class AzureMonitorPublisher(IMetricPublisher):
 
     def push_metric(self, name: str, value: float, dimensions: Dict[str, str] = None) -> bool:
         dim_str = str(dimensions) if dimensions else "None"
-        try:
-            # TODO: Replace with actual Azure Monitor API call post-POC
-            logger.info("Pushed Azure metric", extra={"metric": name, "value": value, "dimensions": dim_str})
-            return True
-        except Exception as e:
-            logger.error("Failed to push metric to Azure", extra={"metric": name}, exc_info=True)
-            return False
+        # TODO: Replace with actual Azure Monitor API call post-POC
+        logger.info("AzureMonitorPublisher not implemented", extra={"metric": name, "value": value, "dimensions": dim_str})
+        return False

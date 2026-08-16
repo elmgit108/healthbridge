@@ -1,7 +1,7 @@
 # HealthBridge Monitoring & Metrics Service — Python/Flask
 #
 # Collects health metrics from all microservices and pushes them to
-# AWS CloudWatch and Azure Monitor. Provides a visual dashboard for
+# AWS CloudWatch. Provides a visual dashboard for
 # real-time service status.
 #
 # Architecture follows SOLID principles:
@@ -18,7 +18,6 @@ from background.scheduler import MetricScheduler
 
 # Concrete implementations of the SOLID interfaces
 from infrastructure.aws_publisher import CloudWatchPublisher
-from infrastructure.azure_publisher import AzureMonitorPublisher
 from infrastructure.http_health_checker import HttpHealthChecker
 from infrastructure.tracing import init_tracing
 from infrastructure.logging_config import init_logging, init_request_logging
@@ -54,7 +53,6 @@ def create_app():
     # 2. Metric publishers — push telemetry to cloud monitoring platforms
     publishers = [
         CloudWatchPublisher(),                             # region comes from AWS_REGION
-        AzureMonitorPublisher()                            # Azure Monitor (stub for POC)
     ]
 
     # 3. Business logic manager — orchestrates health checks and metric publishing

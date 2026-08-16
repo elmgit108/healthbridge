@@ -202,15 +202,6 @@ def test_the_publisher_survives_boto3_failing_at_construction(monkeypatch):
 
 # --- AzureMonitorPublisher ------------------------------------------------
 
-
-def test_the_azure_stub_reports_success():
-    assert AzureMonitorPublisher().push_metric("ServiceHealth", 1.0) is True
-
-
-def test_the_azure_stub_accepts_dimensions():
-    assert AzureMonitorPublisher().push_metric("ServiceHealth", 0.0, {"ServiceName": "gateway"}) is True
-
-
 def test_both_publishers_satisfy_the_same_interface():
     # This substitutability is what lets MonitoringManager stay cloud-agnostic.
     from core.interfaces import IMetricPublisher
