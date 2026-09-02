@@ -21,8 +21,9 @@ WORKDIR /app
 LABEL org.opencontainers.image.source=https://github.com/elmgit108/healthbridge
 
 # Create a non-root user for better security context
-RUN adduser -D -g '' gatekeeper
-USER gatekeeper
+# explicitly enforces UID 10001 across both the creation step and the active runtime user configuration.
+RUN adduser -D -u 10001 -g '' gatekeeper
+USER 10001
 
 # Copy binary from builder
 COPY --from=builder /app/gateway .

@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish .
+USER 1654
 # to connect the package to the github repo.
 LABEL org.opencontainers.image.source=https://github.com/elmgit108/healthbridge
 

@@ -21,11 +21,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Create a non-root user
-RUN adduser --disabled-password --gecos '' monitoruser
-USER monitoruser
-
-# Copy our heavily structured logical components
-COPY --chown=monitoruser:monitoruser . .
+RUN adduser --disabled-password --gecos '' --uid 10002 monitoruser
+USER 10002
+COPY --chown=10002:10002 . .
 
 # Expose the correct port
 EXPOSE 5002
