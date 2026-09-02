@@ -19,6 +19,9 @@ outside containers.
 | .NET SDK | 8.0 | `brew install dotnet-sdk` | HL7 service dev, if not using Nix |
 | Python | 3.11+ | `brew install python@3.11` | Monitoring dev, if not using Nix |
 
+The demo console under `web/` needs **nothing extra** — it is plain HTML, CSS and
+JavaScript served by nginx. No Node.js, no npm, no build step.
+
 ### The Nix shell
 
 `flake.nix` pins the exact versions the Dockerfiles use — Go 1.25, .NET SDK 8,
@@ -76,6 +79,7 @@ This builds and starts:
 |-----------|------|---------|
 | `hl7-service` | 5001 | C# — HL7 v2 parsing, DICOM metadata, FHIR R4 translation |
 | `monitoring-service` | 5002 | Python — health metrics, cloud publishers, dashboard |
+| `web` | 8081 | nginx — the demo console, reached through the gateway |
 | `gateway` | 8080 | Go — reverse proxy and health aggregation |
 | `jaeger` | 16686 | Trace UI (OTLP receivers on 4317 / 4318) |
 
@@ -102,7 +106,52 @@ Expected:
 If a component reports unhealthy, the gateway still responds — that is the point
 of the fan-out. Check which one with `docker compose ps`.
 
-### 1.5 Smoke tests
+### 1.5 Open the demo console
+
+```bash
+open http://localhost:8080/
+```
+
+Three pages, served by the `web` container and reached **through the gateway**,
+so the browser stays on one origin and the pages can call `/api/...` with no
+cross-origin setup:
+
+| Page | What it does |
+|---|---|
+| HL7 | build a message from fields, send it, see the parsed patient and the ACK |
+| FHIR | translate the same message to a FHIR R4 Bundle |
+| DICOM | drag in a `.dcm` file, read the extracted tags |
+
+Useful for demonstrating the API without `curl`, and for generating traffic by
+clicking when you are watching traces or metrics.
+
+#### Editing the pages
+
+The pages are baked into the image at build time, so an edit needs a rebuild of
+that one container:
+
+```bash
+docker compose up -d --build web
+```
+
+Takes a couple of seconds — it is nginx plus four files. Then reload the browser.
+
+`nginx.conf` sets `Cache-Control: no-store`, so you never have to force-refresh
+or wonder whether you are looking at an old page during a demo.
+
+To iterate faster while writing CSS or JavaScript, mount the folder instead of
+rebuilding, by adding this to the `web` service in `docker-compose.yml`:
+
+```yaml
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+```
+
+Then edits appear on reload with no rebuild at all. Remove it before committing —
+the image must contain the files, or the Kubernetes deployment ships an empty
+page.
+
+### 1.6 Smoke tests
 
 `test-data/` holds sample HL7 messages, DICOM metadata and test scripts.
 
@@ -114,7 +163,7 @@ of the fan-out. Check which one with `docker compose ps`.
 ./test-data/test_verbose.sh
 ```
 
-### 1.6 (Optional) Real DICOM files
+### 1.7 (Optional) Real DICOM files
 
 ```bash
 # Downloads sample .dcm files from the fo-dicom open-source repo
@@ -124,19 +173,23 @@ of the fan-out. Check which one with `docker compose ps`.
 ./test-data/run_all_tests.sh
 ```
 
-### 1.7 Manual endpoint checks
+### 1.8 Manual endpoint checks
 
 ```bash
 # Parse an HL7 ADT A01
 curl -X POST http://localhost:8080/api/hl7/parse \
   -H "Content-Type: text/plain" \
   --data-binary $'MSH|^~\\&|HospitalEMR|MainHospital|HealthBridge|CLOUD|20240115120000||ADT^A01|MSG001|P|2.5\rEVN|A01|20240115120000\rPID|1||PAT001^^^MRN||Smith^John^A||19800315|M\rPV1|1|I|ICU^101^A|E'
+```
 
+```bash
 # Translate the same message to FHIR R4
 curl -X POST http://localhost:8080/api/fhir/translate \
   -H "Content-Type: text/plain" \
   --data-binary $'MSH|^~\\&|HospitalEMR|MainHospital|HealthBridge|CLOUD|20240115120000||ADT^A01|MSG001|P|2.5\rEVN|A01|20240115120000\rPID|1||PAT001^^^MRN||Smith^John^A||19800315|M\rPV1|1|I|ICU^101^A|E'
+```
 
+```bash
 # DICOM metadata as JSON
 curl -X POST http://localhost:8080/api/dicom/metadata \
   -H "Content-Type: application/json" \
@@ -148,14 +201,16 @@ curl -X POST http://localhost:8080/api/dicom/metadata \
     "studyDescription": "Chest CT without contrast",
     "institutionName": "Toronto General Hospital"
   }'
+```
 
+```
 curl http://localhost:8080/metrics       # service metrics
 open  http://localhost:8080/dashboard    # visual status page
 open  http://localhost:5001/swagger      # interactive API docs
 open  http://localhost:16686             # Jaeger traces
 ```
 
-### 1.8 Stop
+### 1.9 Stop
 
 ```bash
 docker compose down          # stop containers
@@ -166,7 +221,11 @@ docker compose down -v       # also remove volumes
 
 ## Phase 2 — Run the unit tests
 
-302 tests total, no Docker and no network required.
+300 tests total, no Docker and no network required.
+
+The `web` service has no unit tests. It is static HTML with no build step and no
+server-side logic; what could break is the **contract with the API**, and that is
+already covered — the C# and Go suites pin the response shapes the pages read.
 
 ### 2.1 C# — 199 tests
 
@@ -253,6 +312,11 @@ healthbridge/
 │   ├── main_test.go             Gateway tests (32)
 │   └── Dockerfile               Multi-stage build, port 8080
 ├── monitoring-service/          Python — health metrics + cloud telemetry
+├── web/                         Static demo console — nginx, no build step
+│   ├── index.html               HL7 v2 message builder
+│   ├── fhir.html                HL7 → FHIR R4 translation
+│   ├── dicom.html               .dcm upload + metadata
+│   └── nginx.conf               port 8081, /healthz
 │   ├── api/routes.py            Flask endpoints
 │   ├── services/                MonitoringManager (business logic)
 │   ├── infrastructure/          CloudWatch + Azure publishers, HTTP checker, tracing
@@ -277,6 +341,7 @@ healthbridge/
 
 | Service | URL |
 |---------|-----|
+| **Demo console** | http://localhost:8080/ |
 | Gateway (entry point) | http://localhost:8080 |
 | HL7/DICOM/FHIR service | http://localhost:5001 |
 | Monitoring service | http://localhost:5002 |
@@ -297,8 +362,8 @@ healthbridge/
 | POST | `/api/fhir/translate` | HL7 v2 → FHIR R4 (`text/plain`) |
 | POST | `/api/fhir/translate/json` | HL7 v2 → FHIR R4 (JSON wrapper) |
 | GET | `/metrics` | Service health metrics |
-| POST | `/metrics/push` | Push metric to AWS CloudWatch |
-| POST | `/metrics/push/azure` | Push metric to Azure Monitor |
+| POST | `/metrics/push/aws` | Push metric to AWS CloudWatch |
+| POST | `/metrics/push/azure` | Azure publisher is not wired up — returns 502 |
 | GET | `/dashboard` | Visual status dashboard |
 
 The gateway forwards `/api/hl7/`, `/api/dicom/` and `/api/fhir/` to the C#
@@ -381,8 +446,23 @@ echo "${DOCKER_HOST:-unset}"       # an old DOCKER_HOST export overrides the con
 - Check `OTEL_EXPORTER_OTLP_ENDPOINT` reaches `jaeger:4317` from inside the
   container network, not `localhost`
 
+**Demo console shows an old version after editing**
+- The pages live inside the image. Rebuild that container:
+  `docker compose up -d --build web`
+- If it still looks stale, the browser is not at fault — `nginx.conf` sends
+  `Cache-Control: no-store`. Check the rebuild actually ran: `docker compose ps web`
+
+**Demo console returns 404 for every page**
+- The `web` container is down; the gateway then has nothing to proxy to.
+  `docker compose ps web` and `docker compose logs web`
+
+**A page loads but every request from it fails**
+- Open the browser console. If you see CORS errors, you have opened the page
+  directly (`file://` or `localhost:8081`) instead of **through the gateway**.
+  Use `http://localhost:8080/` — that is what keeps everything on one origin.
+
 **Ports already in use**
-- 8080, 5001, 5002 and 16686 must be free: `lsof -i :8080`
+- 8080, 5001, 5002, 8081 and 16686 must be free: `lsof -i :8080`
 
 ---
 

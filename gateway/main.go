@@ -36,6 +36,7 @@ import (
 var (
 	hl7ServiceURL        = getEnv("HL7_SERVICE_URL", "http://hl7-service:5001")
 	monitoringServiceURL = getEnv("MONITORING_SERVICE_URL", "http://monitoring-service:5002")
+	webServiceURL        = getEnv("WEB_SERVICE_URL", "http://web:8081")
 	port                 = getEnv("PORT", "8080")
 )
 
@@ -275,6 +276,16 @@ func main() {
 
 	// Gateway's own health endpoint — aggregates downstream health
 	router.HandleFunc("/health", healthHandler).Methods("GET")
+
+	// The demo console (static pages) is served by its own nginx container.
+	// Registered LAST because PathPrefix("/") matches everything — gorilla/mux
+	// tries routes in registration order, so every route above still wins.
+	//
+	// It is proxied rather than served here for two reasons: the gateway's job is
+	// routing, not serving HTML; and going through the gateway keeps the browser
+	// on a single origin, so the pages can call /api/... with no CORS setup.
+	webProxy := createProxy(webServiceURL)
+	router.PathPrefix("/").Handler(webProxy)
 
 	// Wrap the entire router with otelhttp — every incoming request becomes
 	// a span automatically, and trace context is propagated to downstream services.

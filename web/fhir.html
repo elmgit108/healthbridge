@@ -1,0 +1,149 @@
+<!doctype html>
+<!--
+  HL7 v2 → FHIR R4 translation.
+
+  Posts a pipe-delimited message to POST /api/fhir/translate (text/plain) and
+  renders the returned FHIR Bundle. The response content type is
+  application/fhir+json, which is FHIR's own media type, not plain JSON.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HealthBridge — FHIR</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>HealthBridge <span>— demo console</span></h1>
+  <nav>
+    <a href="index.html">HL7</a>
+    <a href="fhir.html" class="active">FHIR</a>
+    <a href="dicom.html">DICOM</a>
+  </nav>
+</header>
+
+<main>
+  <p class="intro">
+    The same HL7 v2 message, translated to FHIR R4. HL7 v2 is what hospitals send
+    today; FHIR is where new integration work goes. This endpoint is the bridge
+    between them.
+  </p>
+
+  <div class="cols">
+    <div class="panel">
+      <h2>1 — HL7 v2 input</h2>
+
+      <label for="sample">Sample message</label>
+      <select id="sample">
+        <option value="adt">ADT^A01 — admission</option>
+        <option value="oru">ORU^R01 — lab result</option>
+      </select>
+
+      <label for="raw">Message — edit freely</label>
+      <textarea id="raw" rows="12"></textarea>
+
+      <button id="send">Send to /api/fhir/translate</button>
+    </div>
+
+    <div class="panel">
+      <h2>2 — FHIR R4 Bundle</h2>
+      <p class="status" id="status">Not sent yet.</p>
+
+      <label>Resources returned</label>
+      <table id="summary"><tbody><tr><td>—</td><td></td></tr></tbody></table>
+
+      <label>Full bundle</label>
+      <pre id="out">—</pre>
+    </div>
+  </div>
+</main>
+
+<footer>Response media type: <code>application/fhir+json</code></footer>
+
+<script>
+const SEG = "\r";
+const $ = id => document.getElementById(id);
+
+const SAMPLES = {
+  adt: [
+    "MSH|^~\\&|DEMO_UI|HealthBridge|HL7_SERVICE|HealthBridge|20260101120000||ADT^A01|MSG00001|P|2.5",
+    "EVN|A01|20260101120000",
+    "PID|1||MRN123456||SMITH^JOHN||19700115|M",
+    "PV1|1|I|WARD^ICU^1|E",
+  ].join(SEG),
+  oru: [
+    "MSH|^~\\&|DEMO_UI|HealthBridge|HL7_SERVICE|HealthBridge|20260101120000||ORU^R01|MSG00002|P|2.5",
+    "PID|1||MRN654321||DOE^JANE||19850320|F",
+    "OBR|1||MSG00002|CBC^Complete Blood Count^L",
+    "OBX|1|NM|HGB^Haemoglobin^L||14.2|g/dL|13.0-17.0|N|||F",
+    "OBX|2|NM|WBC^White Blood Cells^L||7.1|10*9/L|4.0-11.0|N|||F",
+  ].join(SEG),
+};
+
+function setStatus(text, kind) {
+  const s = $("status");
+  s.textContent = text;
+  s.className = "status" + (kind ? " " + kind : "");
+}
+
+// A FHIR Bundle carries an "entry" array; each entry has a resource with a
+// resourceType. Counting them is the quickest way to see the translation worked.
+function summarise(bundle) {
+  const body = $("summary").querySelector("tbody");
+  body.innerHTML = "";
+  const entries = (bundle && bundle.entry) || [];
+  if (!entries.length) {
+    body.innerHTML = "<tr><td>no entries</td><td></td></tr>";
+    return;
+  }
+  const counts = {};
+  for (const e of entries) {
+    const t = (e.resource && e.resource.resourceType) || "unknown";
+    counts[t] = (counts[t] || 0) + 1;
+  }
+  for (const [type, n] of Object.entries(counts)) {
+    body.insertAdjacentHTML("beforeend", `<tr><td>${type}</td><td>${n}</td></tr>`);
+  }
+  body.insertAdjacentHTML("beforeend",
+    `<tr><td>bundle type</td><td>${bundle.type || "—"}</td></tr>`);
+}
+
+async function send() {
+  const btn = $("send");
+  btn.disabled = true;
+  setStatus("Translating…");
+  $("out").textContent = "";
+
+  const started = performance.now();
+  try {
+    const res = await fetch("/api/fhir/translate", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: $("raw").value,
+    });
+    const ms = Math.round(performance.now() - started);
+    const text = await res.text();
+
+    let bundle = null;
+    try { bundle = JSON.parse(text); } catch {}
+    $("out").textContent = bundle ? JSON.stringify(bundle, null, 2) : text;
+    summarise(bundle);
+
+    setStatus(`HTTP ${res.status} · ${ms} ms · ${res.headers.get("content-type") || ""}`,
+              res.ok ? "ok" : "err");
+  } catch (e) {
+    setStatus("Request failed: " + e.message, "err");
+    $("out").textContent = String(e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$("send").addEventListener("click", send);
+$("sample").addEventListener("change", () => { $("raw").value = SAMPLES[$("sample").value]; });
+$("raw").value = SAMPLES.adt;
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!doctype html>
+<!--
+  DICOM upload and metadata extraction.
+
+  Two endpoints, both returning JSON:
+    POST /api/dicom/parse      multipart file upload — a real .dcm binary
+    POST /api/dicom/metadata   JSON body — metadata without a file
+
+  Sample .dcm files: ./test-data/download_sample_dcm.sh
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HealthBridge — DICOM</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>HealthBridge <span>— demo console</span></h1>
+  <nav>
+    <a href="index.html">HL7</a>
+    <a href="fhir.html">FHIR</a>
+    <a href="dicom.html" class="active">DICOM</a>
+  </nav>
+</header>
+
+<main>
+  <p class="intro">
+    Upload a <code>.dcm</code> file and see the metadata the parser extracts. A DICOM
+    file carries patient details inside the file itself — which is why imaging data
+    needs the same care as any other patient record.
+  </p>
+
+  <div class="cols">
+    <div class="panel">
+      <h2>1 — Upload a file</h2>
+
+      <div class="drop" id="drop">
+        Drop a <strong>.dcm</strong> file here, or click to choose
+        <input type="file" id="file" accept=".dcm,application/dicom" hidden>
+      </div>
+
+      <p class="status" id="fileinfo">No file selected.</p>
+      <button id="send" disabled>Send to /api/dicom/parse</button>
+
+      <p class="intro" style="margin-top:1.5rem">
+        No sample files? Run <code>./test-data/download_sample_dcm.sh</code> in the
+        repository — it fetches small test images from the fo-dicom project.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h2>2 — Extracted metadata</h2>
+      <p class="status" id="status">Nothing uploaded yet.</p>
+
+      <label>Key tags</label>
+      <table id="tags"><tbody><tr><td>—</td><td></td></tr></tbody></table>
+
+      <label>Full response</label>
+      <pre id="out">—</pre>
+    </div>
+  </div>
+</main>
+
+<footer>DICOM tags follow PS3.6 — see <code>docs/STANDARDS.md</code></footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let chosen = null;
+
+function setStatus(el, text, kind) {
+  const s = $(el);
+  s.textContent = text;
+  s.className = "status" + (kind ? " " + kind : "");
+}
+
+// Fields the C# DicomMetadata model returns. Shown in a fixed order so the
+// table reads the same for every file, whether or not a tag is present.
+const FIELDS = [
+  ["patientName",       "Patient name (0010,0010)"],
+  ["patientId",         "Patient ID (0010,0020)"],
+  ["studyDate",         "Study date (0008,0020)"],
+  ["modality",          "Modality (0008,0060)"],
+  ["studyDescription",  "Study description (0008,1030)"],
+  ["seriesDescription", "Series description (0008,103E)"],
+  ["institutionName",   "Institution (0008,0080)"],
+];
+
+function renderTags(data) {
+  const body = $("tags").querySelector("tbody");
+  body.innerHTML = "";
+  // The payload may be the metadata itself, or wrapped — handle both.
+  const m = (data && (data.metadata || data.Metadata)) || data || {};
+  let shown = 0;
+  for (const [key, label] of FIELDS) {
+    const v = m[key] !== undefined ? m[key] : m[key[0].toUpperCase() + key.slice(1)];
+    if (v === undefined || v === null || v === "") continue;
+    body.insertAdjacentHTML("beforeend", `<tr><td>${label}</td><td>${String(v)}</td></tr>`);
+    shown++;
+  }
+  if (!shown) body.innerHTML = "<tr><td>no recognised tags</td><td></td></tr>";
+}
+
+function choose(f) {
+  chosen = f;
+  $("send").disabled = !f;
+  setStatus("fileinfo", f ? `${f.name} — ${(f.size / 1024).toFixed(1)} KB` : "No file selected.");
+}
+
+const drop = $("drop");
+drop.addEventListener("click", () => $("file").click());
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => {
+  e.preventDefault();
+  drop.classList.remove("over");
+  if (e.dataTransfer.files.length) choose(e.dataTransfer.files[0]);
+});
+$("file").addEventListener("change", e => { if (e.target.files.length) choose(e.target.files[0]); });
+
+async function send() {
+  if (!chosen) return;
+  const btn = $("send");
+  btn.disabled = true;
+  setStatus("status", "Uploading…");
+  $("out").textContent = "";
+
+  // multipart/form-data — the field name must be "file", matching the controller.
+  // Do NOT set Content-Type by hand: the browser adds the multipart boundary.
+  const form = new FormData();
+  form.append("file", chosen);
+
+  const started = performance.now();
+  try {
+    const res = await fetch("/api/dicom/parse", { method: "POST", body: form });
+    const ms = Math.round(performance.now() - started);
+    const text = await res.text();
+
+    let data = null;
+    try { data = JSON.parse(text); } catch {}
+    $("out").textContent = data ? JSON.stringify(data, null, 2) : text;
+    renderTags(data);
+
+    setStatus("status", `HTTP ${res.status} · ${ms} ms`, res.ok ? "ok" : "err");
+  } catch (e) {
+    setStatus("status", "Upload failed: " + e.message, "err");
+    $("out").textContent = String(e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$("send").addEventListener("click", send);
+</script>
+</body>
+</html>

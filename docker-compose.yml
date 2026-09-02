@@ -52,6 +52,18 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  web:
+    build: ./web
+    container_name: healthbridge-web
+    # non-root nginx removes the IPv6 listener, so localhost health checks fail
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8081/healthz"] 
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     container_name: healthbridge-gateway
@@ -60,11 +72,13 @@ services:
     environment:
       - HL7_SERVICE_URL=http://hl7-service:5001
       - MONITORING_SERVICE_URL=http://monitoring-service:5002
+      - WEB_SERVICE_URL=http://web:8081
       - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
       - OTEL_SERVICE_NAME=gateway
     depends_on:
       - hl7-service
       - monitoring-service
+      - web
       - jaeger
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]

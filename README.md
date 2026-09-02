@@ -2,26 +2,31 @@
 
 Polyglot microservices project for healthcare data integration. Parses HL7 v2
 clinical messages and DICOM medical imaging metadata, translates HL7 to FHIR R4,
-and reports service health — with distributed tracing across all three services.
+and reports service health — with distributed tracing across the three backend
+services, and a small web console to drive them.
 
 ```
-  ┌──────────────────────────────────────────────────┐
+                        browser
+                           │  everything on one origin
+  ┌────────────────────────▼─────────────────────────┐
   │              Go API Gateway :8080                │
   │        routes all traffic, health aggregation    │
-  └──────────┬────────────────────────┬──────────────┘
-             │                        │
-  ┌──────────▼──────────┐  ┌──────────▼──────────────┐
-  │  C# HL7/DICOM :5001 │  │  Python Monitoring :5002│
-  │  nHapi + fo-dicom   │  │  Flask + boto3 + Azure  │
-  │  + Firely (FHIR R4) │  │  Metrics + Dashboard    │
-  └──────────┬──────────┘  └──────────┬──────────────┘
-             │                        │
-             └────────┬───────────────┘
-                      ▼
-             ┌──────────────────┐
-             │  Jaeger  :16686  │
-             │  OTLP traces     │
-             └──────────────────┘
+  └───┬─────────────────┬───────────────────┬────────┘
+      │                 │                   │
+  ┌───▼──────────┐ ┌────▼──────────────┐ ┌──▼──────────────┐
+  │ C# HL7/DICOM │ │ Python Monitoring │ │  Web  :8081     │
+  │       :5001  │ │            :5002  │ │  nginx — three  │
+  │ nHapi +      │ │ Flask             │ │  demo pages     │
+  │ fo-dicom +   │ │ Metrics +         │ │  (HL7, FHIR,    │
+  │ Firely R4    │ │ Dashboard         │ │   DICOM upload) │
+  └───┬──────────┘ └────┬──────────────┘ └─────────────────┘
+      │                 │
+      └────────┬────────┘
+               ▼
+      ┌──────────────────┐
+      │  Jaeger  :16686  │
+      │  OTLP traces     │
+      └──────────────────┘
 ```
 
 **Stack:** C# / ASP.NET Core 8 · Go 1.25 · Python 3.11 / Flask · OpenTelemetry ·
@@ -47,9 +52,10 @@ curl http://localhost:8080/health
 
 | Service | URL | What it does |
 |---------|-----|--------------|
+| Demo console | http://localhost:8080/ | Build HL7 messages, translate to FHIR, upload DICOM |
 | Go Gateway | http://localhost:8080 | Entry point, routes to backend services |
 | C# HL7/DICOM/FHIR | http://localhost:5001 | Parses HL7 v2, DICOM metadata, HL7→FHIR |
-| Python Monitoring | http://localhost:5002 | Health metrics, CloudWatch/Azure push |
+| Python Monitoring | http://localhost:5002 | Health metrics, CloudWatch push, dashboard |
 | Swagger UI | http://localhost:5001/swagger | Interactive API docs |
 | Dashboard | http://localhost:8080/dashboard | Visual service status page |
 | Jaeger UI | http://localhost:16686 | Distributed traces across all services |
@@ -70,7 +76,7 @@ on `cd`.
 
 ## Run the Tests
 
-**302 unit tests** across the three services. No Docker, no network:
+**300 unit tests** across the three backend services. No Docker, no network:
 
 | Suite | Tests | Command |
 |-------|-------|---------|
@@ -180,8 +186,8 @@ All requests go through the gateway on port 8080.
 | POST | `/api/fhir/translate` | hl7-service | Translate raw HL7 v2 to FHIR R4 (`text/plain`) |
 | POST | `/api/fhir/translate/json` | hl7-service | Translate HL7 to FHIR from a JSON wrapper |
 | GET | `/metrics` | monitoring | Service health metrics (JSON) |
-| POST | `/metrics/push` | monitoring | Push custom metric to AWS CloudWatch |
-| POST | `/metrics/push/azure` | monitoring | Push custom metric to Azure Monitor |
+| POST | `/metrics/push/aws` | monitoring | Push custom metric to AWS CloudWatch |
+| POST | `/metrics/push/azure` | monitoring | Azure publisher is not wired up — returns 502 |
 | GET | `/dashboard` | monitoring | Visual status dashboard (HTML) |
 
 ---
@@ -242,9 +248,10 @@ healthbridge/
 │   ├── main_test.go             Gateway tests (32)
 │   └── Dockerfile               Multi-stage build, port 8080
 ├── monitoring-service/          Python — health metrics + cloud telemetry
+├── web/                         Static demo console (nginx, no build step)
 │   ├── api/routes.py            Flask endpoints
 │   ├── services/                MonitoringManager (business logic)
-│   ├── infrastructure/          CloudWatch + Azure Monitor publishers, tracing
+│   ├── infrastructure/          CloudWatch publisher, tracing, logging
 │   ├── core/                    Interfaces, data models, constants
 │   ├── background/              APScheduler health sweep
 │   ├── tests/                   pytest suite (71)
