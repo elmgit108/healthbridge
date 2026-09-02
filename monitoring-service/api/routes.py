@@ -34,7 +34,7 @@ def initialize_routes(app, manager: MonitoringManager):
         status_code = 200 if health.status == HealthStatus.HEALTHY else 503
         return jsonify(dataclasses.asdict(health)), status_code
 
-    @app.route('/metrics/push', methods=['POST'])
+    @app.route('/metrics/push/aws', methods=['POST'])
     def push_aws_metric():
         """
         Push a custom metric to AWS CloudWatch.
@@ -44,12 +44,11 @@ def initialize_routes(app, manager: MonitoringManager):
         name = data.get('name', DEFAULT_METRIC_NAME)
         value = data.get('value', 1.0)
 
-        # Find the AWS publisher among the registered publishers
-        for pub in manager.publishers:
-            if isinstance(pub, CloudWatchPublisher):
-                pub.push_metric(name, value)
+        ok = any(pub.push_metric(name, value)
+            for pub in manager.publishers
+                if isinstance(pub, CloudWatchPublisher))
 
-        return jsonify({"status": "Pushed to AWS"}), 200
+        return jsonify({"status": "pushed" if ok else "publish failed"}), 200 if ok else 502
 
     @app.route('/metrics/push/azure', methods=['POST'])
     def push_azure_metric():
@@ -61,11 +60,11 @@ def initialize_routes(app, manager: MonitoringManager):
         name = data.get('name', DEFAULT_METRIC_NAME)
         value = data.get('value', 1.0)
 
-        for pub in manager.publishers:
-            if isinstance(pub, AzureMonitorPublisher):
-                pub.push_metric(name, value)
-
-        return jsonify({"status": "Pushed to Azure"}), 200
+        ok = any(pub.push_metric(name, value)
+            for pub in manager.publishers
+                if isinstance(pub, AzureMonitorPublisher))
+        
+        return jsonify({"status": "pushed" if ok else "publish failed"}), 200 if ok else 502
 
     @app.route('/dashboard', methods=['GET'])
     def dashboard():

@@ -98,7 +98,7 @@ def test_metrics_response_matches_the_dataclass_shape():
     assert set(payload) == set(dataclasses.asdict(manager.check_all_services()))
 
 
-# --- POST /metrics/push (AWS) ---------------------------------------------
+# --- POST /metrics/push/aws -----------------------------------------------
 
 
 class FakeCloudWatch(CloudWatchPublisher):
@@ -126,9 +126,10 @@ def test_push_sends_the_named_metric_to_the_aws_publisher_only():
     aws, azure = FakeCloudWatch(), FakeAzure()
     client, _ = build_client(publishers=[aws, azure])
 
-    response = client.post("/metrics/push", json={"name": "TestMetric", "value": 42.0})
+    response = client.post("/metrics/push/aws", json={"name": "TestMetric", "value": 42.0})
 
     assert response.status_code == 200
+    assert response.get_json() == {"status": "pushed"}
     assert aws.published == [("TestMetric", 42.0, None)]
     assert azure.published == []   # routing is by publisher type
 
@@ -137,7 +138,7 @@ def test_push_defaults_the_metric_name_and_value_when_omitted():
     aws = FakeCloudWatch()
     client, _ = build_client(publishers=[aws])
 
-    client.post("/metrics/push", json={})
+    client.post("/metrics/push/aws", json={})
 
     assert aws.published == [("CustomMetric", 1.0, None)]
 
@@ -158,21 +159,39 @@ def test_push_rejects_a_missing_or_malformed_body(kwargs, expected_status):
     aws = FakeCloudWatch()
     client, _ = build_client(publishers=[aws])
 
-    response = client.post("/metrics/push", **kwargs)
+    response = client.post("/metrics/push/aws", **kwargs)
 
     assert response.status_code == expected_status
     assert aws.published == []
 
 
-def test_push_succeeds_even_when_no_aws_publisher_is_registered():
-    # The loop simply finds no match. Worth pinning: the caller gets a 200 and no
-    # indication that nothing was published.
+def test_push_reports_failure_when_no_aws_publisher_is_registered():
+    # The loop finds no match, so nothing is published. The caller must be told:
+    # answering 200 here is what let the endpoint claim success while doing
+    # nothing at all.
     client, _ = build_client(publishers=[FakeAzure()])
 
-    response = client.post("/metrics/push", json={"name": "M", "value": 1.0})
+    response = client.post("/metrics/push/aws", json={"name": "M", "value": 1.0})
 
-    assert response.status_code == 200
-    assert response.get_json() == {"status": "Pushed to AWS"}
+    assert response.status_code == 502
+    assert response.get_json() == {"status": "publish failed"}
+
+
+def test_push_reports_failure_when_the_publisher_returns_false():
+    # A registered publisher whose backend rejected the metric. Previously this
+    # also returned 200 — the result of push_metric was discarded.
+    class FailingCloudWatch(FakeCloudWatch):
+        def push_metric(self, name, value, dimensions=None):
+            super().push_metric(name, value, dimensions)
+            return False
+
+    aws = FailingCloudWatch()
+    client, _ = build_client(publishers=[aws])
+
+    response = client.post("/metrics/push/aws", json={"name": "M", "value": 1.0})
+
+    assert response.status_code == 502
+    assert aws.published == [("M", 1.0, None)]   # it was attempted
 
 
 # --- POST /metrics/push/azure ---------------------------------------------
@@ -185,6 +204,7 @@ def test_azure_push_sends_to_the_azure_publisher_only():
     response = client.post("/metrics/push/azure", json={"name": "TestMetric", "value": 7.0})
 
     assert response.status_code == 200
+    assert response.get_json() == {"status": "pushed"}
     assert azure.published == [("TestMetric", 7.0, None)]
     assert aws.published == []
 
@@ -236,7 +256,7 @@ def test_dashboard_still_renders_when_a_service_is_down():
     [
         ("post", "/health"),
         ("post", "/metrics"),
-        ("get", "/metrics/push"),
+        ("get", "/metrics/push/aws"),
         ("get", "/metrics/push/azure"),
     ],
 )

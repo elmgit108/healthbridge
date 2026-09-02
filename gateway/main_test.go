@@ -473,7 +473,7 @@ func TestRouterSendsKnownPrefixesToABackend(t *testing.T) {
 		"/fhir/translate",
 		"/metrics",  // no trailing slash — Flask routes omit it
 		"/metrics/", // with trailing slash
-		"/metrics/push",
+		"/metrics/push/aws",
 		"/dashboard",
 	}
 
