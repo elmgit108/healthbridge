@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hb-gw-deployment
+  namespace: healthbridge
+  labels:
+    app: hb-gateway
+spec:
+  #replicas: 1 #  will fight the HPA remove or comment when HPA added
+  selector:
+    matchLabels:
+     app: hb-gateway
+  template:
+    metadata:
+      labels: 
+        app: hb-gateway
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      containers:
+      - name: hb-gw-container
+        image: ghcr.io/elmgit108/healthbridge-gateway:v0.1.1
+        envFrom: # injects every key from ConfigMap as env var, after chengig configMap need to restart Pod  
+          - configMapRef:
+              name: hb-config
+        env: # need for Go env: always over envFrom: order does not matter
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: "jaeger:4317"
+          - name: GOMEMLIMIT
+            value: "112MiB" #112Mi - (~88%) GC works harder(soft, Go) on 128mi - OOMKilled (hard, kernel) 
+        ports:
+          - containerPort: 8080
+            protocol: TCP # TCP is default , added for consistency 
+        livenessProbe:  # must only test itself
+          tcpSocket:
+            port: 8080
+        readinessProbe:
+          tcpSocket:
+            port: 8080
+        resources:
+          requests:
+            cpu: 100m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway # must match  "http://gateway:8080"
+  namespace: healthbridge
+  labels:
+    app: hb-gateway
+spec:
+  selector:
+    app: hb-gateway
+  type: NodePort # gateway must be reachable from LAN 
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hb-gateway-hpa
+  namespace: healthbridge
+spec:
+  # target workload to scale
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hb-gw-deployment
+  # scaling bounderies
+  minReplicas: 2
+  maxReplicas: 10
+  #target threesholds
+  metrics:
+  - type: Resource
+    resource: 
+     name: cpu
+     target:
+       type: Utilization
+       averageUtilization: 65
+
+

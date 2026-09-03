@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hb-config
+  namespace: healthbridge
+  labels:
+    app: healthbridge
+data:
+  HL7_SERVICE_URL: "http://hl7-service:5001"
+  MONITORING_SERVICE_URL: "http://monitoring-service:5002"
+  WEB_SERVICE_URL: "http://web:8081"
+  GATEWAY_URL: "http://gateway:8080"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+  # AWS_REGION: "ca-central-1" # TODO parametrazed 

@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hb-hl7-service-deployment
+  namespace: healthbridge
+  labels:
+    app: hb-hl7-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hb-hl7-service
+  template:
+    metadata:
+      labels:
+        app: hb-hl7-service
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64M
+      containers:
+      - name: hb-hl7-service-container
+        image: ghcr.io/elmgit108/healthbridge-hl7:v0.1.1
+        envFrom: # injects every key from ConfigMap as env var, after chengig configMap need to restart Pod  
+          - configMapRef:
+              name: hb-config
+          - secretRef:
+              name: hb-secret
+        ports:
+          - containerPort: 5001
+        # readnes probe failed as the probe fired in gap between the container starting and the app listening
+        # adds 60 sec to boot
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          failureThreshold: 30
+          periodSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+        resources:
+          requests:
+            cpu: 100m
+            memory: 192Mi
+          limits:
+            memory: 512Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1654
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+          - name: tmp
+            mountPath: /tmp
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hl7-service
+  namespace: healthbridge
+  labels:
+    app: hb-hl7-service
+spec:
+  # private internal IP
+  type: ClusterIP
+  selector:
+      app: hb-hl7-service
+  ports:
+    - name: http
+      port: 5001 
+      targetPort: 5001
+      protocol: TCP

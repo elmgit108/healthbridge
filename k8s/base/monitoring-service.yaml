@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hb-monitoring-deployment
+  namespace: healthbridge
+  labels:
+    app: hb-monitoring-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hb-monitoring-service
+  template:
+    metadata: 
+      labels:
+        app: hb-monitoring-service
+    spec:
+      imagePullSecrets:
+      - name: ghcr
+      containers:
+      - name: hb-monitoring-service-container
+        image: ghcr.io/elmgit108/healthbridge-monitoring:v0.1.1
+        envFrom: # injects every key from ConfigMap as env var, after chengig configMap need to restart Pod  
+          - configMapRef:
+              name: hb-config
+        ports:
+          - containerPort: 5002
+        livenessProbe: 
+          httpGet:
+            path: /health
+            port: 5002
+        readinessProbe:  
+          httpGet:
+            path: /health
+            port: 5002      
+        resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+        securityContext:
+            runAsNonRoot: true
+            runAsUser: 10002
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: monitoring-service
+  namespace: healthbridge
+  labels:
+    app: hb-monitoring-service
+spec:
+  type: ClusterIP
+  selector:
+    app: hb-monitoring-service
+  ports:
+  - name: http
+    port: 5002
+    targetPort: 5002
+    protocol: TCP
+
