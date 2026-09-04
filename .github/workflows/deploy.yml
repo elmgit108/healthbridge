@@ -1,0 +1,54 @@
+name: Build & Deploy HealthBridge
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+jobs:
+  # --- Build and push all 3 Docker images ---
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - service: hl7-service
+            image: healthbridge-hl7
+            context: ./hl7-service
+          - service: gateway
+            image: healthbridge-gateway
+            context: ./gateway
+          - service: monitoring-service
+            image: healthbridge-monitoring
+            context: ./monitoring-service
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # TODO Build and push need to be splited for Trivy to scan after build before push
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:${{ github.sha }}
+
+  # TODO Deploy to AWS via Ansible
+  
+  # TODO Deploy to Azure via Ansible
+  
+  # TODO Smoke test AWS and Azure
+  
