@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hb-web-deployment
-  namespace: healthbridge
   labels:
     app: hb-web
     tier: frontend
@@ -25,7 +24,7 @@ spec:
             sizeLimit: 16M
       containers:
       - name: hb-web-container
-        image: ghcr.io/elmgit108/healthbridge-web:v0.1.1
+        image: healthbridge-web
         ports:
           - containerPort: 8081
         livenessProbe:
@@ -62,7 +61,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web
-  namespace: healthbridge
   labels:
     app: hb-web
     tier: frontend

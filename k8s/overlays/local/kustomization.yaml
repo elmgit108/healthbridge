@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: healthbridge
+
+resources:
+  - ../../base/
+images:
+  - name: healthbridge-gateway
+    newName: ghcr.io/elmgit108/healthbridge-gateway
+    newTag: v0.1.1
+  - name: healthbridge-hl7
+    newName: ghcr.io/elmgit108/healthbridge-hl7
+    newTag: v0.1.1
+  - name: healthbridge-monitoring
+    newName: ghcr.io/elmgit108/healthbridge-monitoring
+    newTag: v0.1.1
+  - name: healthbridge-web
+    newName: ghcr.io/elmgit108/healthbridge-web
+    newTag: v0.1.1

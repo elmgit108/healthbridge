@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hb-jaeger
+  labels:
+    app: hb-jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hb-jaeger
+  template:
+    metadata:
+      labels:
+        app: hb-jaeger
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:1.55  # Uses Jaeger v1
+          env:
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"
+            - name: MEMORY_MAX_TRACES
+              value: "10000"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          ports:
+            - name: ui
+              containerPort: 16686 # Jaeger UI
+            - name: otlp-grpc
+              containerPort: 4317  # OTLP gRPC receiver
+            - name: otlp-http
+              containerPort: 4318  # OTLP HTTP receiver
+          livenessProbe: 
+            tcpSocket:
+              port: 16686
+          readinessProbe:  
+            tcpSocket:
+              port: 16686   
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+spec:
+  selector:
+    app: hb-jaeger
+  ports:
+    - name: ui
+      port: 16686
+      targetPort: ui
+    - name: otlp-grpc
+      port: 4317
+      targetPort: otlp-grpc
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+  type: ClusterIP

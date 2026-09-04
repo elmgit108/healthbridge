@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hb-hl7-service-deployment
-  namespace: healthbridge
   labels:
     app: hb-hl7-service
 spec:
@@ -23,7 +22,7 @@ spec:
             sizeLimit: 64M
       containers:
       - name: hb-hl7-service-container
-        image: ghcr.io/elmgit108/healthbridge-hl7:v0.1.1
+        image: healthbridge-hl7
         envFrom: # injects every key from ConfigMap as env var, after chengig configMap need to restart Pod  
           - configMapRef:
               name: hb-config
@@ -70,7 +69,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: hl7-service
-  namespace: healthbridge
   labels:
     app: hb-hl7-service
 spec:
