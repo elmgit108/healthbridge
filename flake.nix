@@ -25,6 +25,7 @@
           # Language toolchains. Keep these matched to the Dockerfiles, or local
           # tests and the built image drift apart.
           pkgs.go_1_25 # gateway/Dockerfile             golang:1.25-alpine
+          pkgs.govulncheck # vulnerability scan for go
           pkgs.dotnet-sdk_8 # hl7-service/Dockerfile         dotnet/sdk:8.0
           pkgs.python311 # monitoring-service/Dockerfile  python:3.11-slim
 
