@@ -28,7 +28,7 @@
           pkgs.govulncheck # vulnerability scan for go
           pkgs.dotnet-sdk_8 # hl7-service/Dockerfile         dotnet/sdk:8.0
           pkgs.python311 # monitoring-service/Dockerfile  python:3.11-slim
-
+          pkgs.pip-audit # vulnerability scan for python
           # Cluster and infrastructure tooling.
           pkgs.kubectl
           pkgs.kubernetes-helm # NB: 'helm' in nixpkgs is an unrelated package
